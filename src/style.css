@@ -40,15 +40,55 @@ canvas {
   align-items: center;
   justify-content: center;
   z-index: 10;
-  pointer-events: none; /* Let canvas handle non-text clicks */
+  pointer-events: none;
 }
 
 .hidden-link-overlay a {
   font-family: sans-serif;
   font-size: 16px;
   font-weight: bold;
-  color: transparent; /* Text is visually rendered by WebGPU */
+  color: transparent;
   text-decoration: none;
-  pointer-events: auto; /* Re-enable clicks exactly on the text */
+  pointer-events: auto;
   cursor: pointer;
+}
+
+.controls-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+  background: rgba(15, 15, 15, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  color: white;
+  font-family: "Anonymous Pro", monospace;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+  accent-color: #ffffff;
+  background: transparent;
 }
