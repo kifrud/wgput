@@ -2,109 +2,9 @@ import { mat4, vec3 } from "gl-matrix";
 import "./style.css";
 import pyramidShader from "./shaders/pyramid.wgsl?raw";
 import fullscreenBgShader from "./shaders/bg.wgsl?raw";
-
-function generatePyramidData() {
-  const w = 1.25; // Width & Depth
-  const h = 1.35; // Height of the tip
-  const b = -1; // Bottom base Y level
-
-  const positions = new Float32Array([
-    // Front face
-    -w,
-    b,
-    w,
-    w,
-    b,
-    w,
-    0,
-    h,
-    0,
-    // Right face
-    w,
-    b,
-    w,
-    w,
-    b,
-    -w,
-    0,
-    h,
-    0,
-    // Back face
-    w,
-    b,
-    -w,
-    -w,
-    b,
-    -w,
-    0,
-    h,
-    0,
-    // Left face
-    -w,
-    b,
-    -w,
-    -w,
-    b,
-    w,
-    0,
-    h,
-    0,
-    // Bottom faces
-    -w,
-    b,
-    -w,
-    w,
-    b,
-    -w,
-    w,
-    b,
-    w,
-    -w,
-    b,
-    -w,
-    w,
-    b,
-    w,
-    -w,
-    b,
-    w,
-  ]);
-
-  const normals = new Float32Array(positions.length);
-  for (let i = 0; i < positions.length; i += 9) {
-    const p0x = positions[i],
-      p0y = positions[i + 1],
-      p0z = positions[i + 2];
-    const p1x = positions[i + 3],
-      p1y = positions[i + 4],
-      p1z = positions[i + 5];
-    const p2x = positions[i + 6],
-      p2y = positions[i + 7],
-      p2z = positions[i + 8];
-
-    const ux = p1x - p0x,
-      uy = p1y - p0y,
-      uz = p1z - p0z;
-    const vx = p2x - p0x,
-      vy = p2y - p0y,
-      vz = p2z - p0z;
-
-    let nx = uy * vz - uz * vy,
-      ny = uz * vx - ux * vz,
-      nz = ux * vy - uy * vx;
-    const len = Math.hypot(nx, ny, nz);
-    nx /= len;
-    ny /= len;
-    nz /= len;
-
-    for (let v = 0; v < 3; v++) {
-      normals[i + v * 3] = nx;
-      normals[i + v * 3 + 1] = ny;
-      normals[i + v * 3 + 2] = nz;
-    }
-  }
-  return { positions, normals };
-}
+import { generatePyramidData } from "./utils/genPyramidData";
+import { defaultShaderParams } from "./defaults";
+import { createStore } from "./store";
 
 // Global offscreen canvas for text rendering
 const textCanvas = document.createElement("canvas");
@@ -133,7 +33,6 @@ function updateTextTexture(
   const text = "text";
   textCtx.fillText(text, width / 2, height / 2);
 
-  // Draw the underline if hovered!
   if (hovered) {
     const metrics = textCtx.measureText(text);
     const textWidth = metrics.width;
@@ -149,12 +48,95 @@ function updateTextTexture(
   );
 }
 
+const paramConfigs = [
+  { name: "ior", min: 1.0, max: 3.0, step: 0.01 },
+  { name: "blur_base", min: 0.0, max: 0.02, step: 0.0001 },
+  { name: "blur_edge", min: 0.0, max: 0.05, step: 0.0001 },
+  { name: "distortion_base", min: 0.0, max: 0.2, step: 0.001 },
+  { name: "distortion_edge", min: 0.0, max: 0.2, step: 0.001 },
+  { name: "specular_intensity", min: 0.0, max: 3.0, step: 0.01 },
+  { name: "specular_exponent", min: 1.0, max: 128.0, step: 1.0 },
+  { name: "edge_glow", min: 0.0, max: 2.0, step: 0.01 },
+  { name: "chromatic_aberration", min: 0.0, max: 0.2, step: 0.001 },
+];
+
+type ShaderParamsStore = Record<string, number>;
+
 // Core WebGPU Setup
 async function init() {
   const canvas = document.getElementById("webgpu-canvas") as HTMLCanvasElement;
   if (!navigator.gpu) {
     alert("WebGPU is not supported on this browser.");
     return;
+  }
+
+  const store = createStore<ShaderParamsStore>();
+
+  paramConfigs.forEach((cfg, i) => {
+    store[cfg.name] = defaultShaderParams[i];
+  });
+
+  const controlsPanel = document.querySelector(
+    ".controls-panel",
+  ) as HTMLDivElement;
+  if (controlsPanel) {
+    // TODO: redo styling
+    controlsPanel.style.position = "absolute";
+    controlsPanel.style.top = "20px";
+    controlsPanel.style.right = "20px";
+    controlsPanel.style.background = "rgba(10, 10, 10, 0.85)";
+    controlsPanel.style.color = "#fff";
+    controlsPanel.style.padding = "15px";
+    controlsPanel.style.borderRadius = "8px";
+    controlsPanel.style.fontFamily = "monospace";
+    controlsPanel.style.display = "flex";
+    controlsPanel.style.flexDirection = "column";
+    controlsPanel.style.gap = "12px";
+    controlsPanel.style.zIndex = "100";
+    controlsPanel.style.width = "250px";
+    controlsPanel.style.backdropFilter = "blur(4px)";
+
+    paramConfigs.forEach((cfg) => {
+      const wrapper = document.createElement("div");
+      wrapper.style.display = "flex";
+      wrapper.style.flexDirection = "column";
+
+      const label = document.createElement("label");
+      label.style.marginBottom = "5px";
+      label.style.fontSize = "12px";
+      label.style.display = "flex";
+      label.style.justifyContent = "space-between";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = cfg.name;
+
+      const valueSpan = document.createElement("span");
+      valueSpan.textContent = store[cfg.name].toString();
+
+      label.appendChild(nameSpan);
+      label.appendChild(valueSpan);
+
+      const input = document.createElement("input");
+      input.type = "range";
+      input.min = cfg.min.toString();
+      input.max = cfg.max.toString();
+      input.step = cfg.step.toString();
+      input.value = store[cfg.name].toString();
+
+      input.addEventListener("input", (e) => {
+        store[cfg.name] = parseFloat((e.target as HTMLInputElement).value);
+      });
+
+      store.$subscribe((prop, value) => {
+        if (prop === cfg.name) {
+          valueSpan.textContent = value.toString();
+        }
+      });
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      controlsPanel.appendChild(wrapper);
+    });
   }
 
   const adapter = await navigator.gpu.requestAdapter();
@@ -424,15 +406,15 @@ async function init() {
 
     // Reactive parameters start at byte offset 160
     const shaderParams = new Float32Array([
-      1.5, // [0] ior
-      0.0007, // [1] blur_base
-      0.0025, // [2] blur_edge
-      0.01, // [3] distortion_base
-      0.025, // [4] distortion_edge
-      0.8, // [5] specular_intensity
-      64.0, // [6] specular_exponent
-      0.3, // [7] edge_glow
-      0.05, // [8] chromatic_aberration
+      store.ior, // [0]
+      store.blur_base, // [1]
+      store.blur_edge, // [2]
+      store.distortion_base, // [3]
+      store.distortion_edge, // [4]
+      store.specular_intensity, // [5]
+      store.specular_exponent, // [6]
+      store.edge_glow, // [7]
+      store.chromatic_aberration, // [8]
       0.0, // [9] pad1
       0.0, // [10] pad2
       0.0, // [11] pad3
