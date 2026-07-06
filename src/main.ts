@@ -79,33 +79,14 @@ async function init() {
   const controlsPanel = document.querySelector(
     ".controls-panel",
   ) as HTMLDivElement;
-  if (controlsPanel) {
-    // TODO: redo styling
-    controlsPanel.style.position = "absolute";
-    controlsPanel.style.top = "20px";
-    controlsPanel.style.right = "20px";
-    controlsPanel.style.background = "rgba(10, 10, 10, 0.85)";
-    controlsPanel.style.color = "#fff";
-    controlsPanel.style.padding = "15px";
-    controlsPanel.style.borderRadius = "8px";
-    controlsPanel.style.fontFamily = "monospace";
-    controlsPanel.style.display = "flex";
-    controlsPanel.style.flexDirection = "column";
-    controlsPanel.style.gap = "12px";
-    controlsPanel.style.zIndex = "100";
-    controlsPanel.style.width = "250px";
-    controlsPanel.style.backdropFilter = "blur(4px)";
 
+  if (controlsPanel) {
     paramConfigs.forEach((cfg) => {
       const wrapper = document.createElement("div");
-      wrapper.style.display = "flex";
-      wrapper.style.flexDirection = "column";
+      wrapper.className = "control-group";
 
       const label = document.createElement("label");
-      label.style.marginBottom = "5px";
-      label.style.fontSize = "12px";
-      label.style.display = "flex";
-      label.style.justifyContent = "space-between";
+      label.className = "control-header";
 
       const nameSpan = document.createElement("span");
       nameSpan.textContent = cfg.name;
