@@ -44,9 +44,7 @@ canvas {
 }
 
 .hidden-link-overlay a {
-  font-family: sans-serif;
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 1rem;
   color: transparent;
   text-decoration: none;
   pointer-events: auto;
