@@ -13,11 +13,62 @@
         <a
           id="hover-link"
           class="anonymous-pro-regular"
-          href="https://webgpu.org"
+          href="https://github.com/kifrud/wgput"
           target="_blank"
-        >text</a>
+          >https://github.com/kifrud/wgput
+        </a>
       </div>
-      <div class="controls-panel"></div>
+
+      <div
+        id="no-webgpu-overlay"
+        class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/90 p-6 backdrop-blur-sm"
+      >
+        <div
+          class="text-white text-center anonymous-pro-regular max-w-lg leading-relaxed"
+        >
+          <p class="text-xl font-bold mb-4 text-red-400">
+            WebGPU Initialization Failed
+          </p>
+          <p class="mb-2">check supported browsers at</p>
+          <a
+            class="text-blue-400 hover:text-blue-300 underline break-all"
+            href="https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API#browser_compatibility"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            WebGPU_API#browser_compatibility
+          </a>
+        </div>
+      </div>
+
+      <div class="controls-panel">
+        <div
+          id="controls-toggle"
+          class="flex justify-between items-center cursor-pointer select-none"
+        >
+          <span class="font-bold text-[13px] tracking-wide text-gray-200"
+            >CONTROLS <span class="text-neutral-500 text-xs">(double click to reset)</span></span
+          >
+          <svg
+            id="controls-chevron"
+            class="w-4 h-4 transition-transform duration-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M5 15l7-7 7 7"
+            ></path>
+          </svg>
+        </div>
+        <div
+          id="controls-content"
+          class="flex flex-col gap-3 mt-4 overflow-hidden transition-all duration-300 max-h-[1000px] opacity-100"
+        />
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

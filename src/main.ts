@@ -3,123 +3,23 @@ import "./style.css";
 import pyramidShader from "./shaders/pyramid.wgsl?raw";
 import fullscreenBgShader from "./shaders/bg.wgsl?raw";
 import { generatePyramidData } from "./utils/genPyramidData";
-import { defaultShaderParams } from "./defaults";
+import { paramConfigs, type ShaderParamsStore } from "./config";
 import { createStore } from "./store";
-
-// Global offscreen canvas for text rendering
-const textCanvas = document.createElement("canvas");
-const textCtx = textCanvas.getContext("2d")!;
-
-// Re-draws the canvas and pushes it to the GPU texture
-function updateTextTexture(
-  device: GPUDevice,
-  texture: GPUTexture,
-  width: number,
-  height: number,
-  hovered: boolean,
-) {
-  textCanvas.width = width;
-  textCanvas.height = height;
-
-  // Background
-  textCtx.fillStyle = "#000000";
-  textCtx.fillRect(0, 0, width, height);
-
-  // Text
-  textCtx.fillStyle = "#ffffff";
-  textCtx.font = '16px "Anonymous Pro", monospace';
-  textCtx.textAlign = "center";
-  textCtx.textBaseline = "middle";
-  const text = "text";
-  textCtx.fillText(text, width / 2, height / 2);
-
-  if (hovered) {
-    const metrics = textCtx.measureText(text);
-    const textWidth = metrics.width;
-    // Positioned roughly 45px below the middle vertical alignment
-    textCtx.fillRect((width - textWidth) / 2, height / 2 + 8, textWidth, 1);
-  }
-
-  // Send updated canvas to the GPU
-  device.queue.copyExternalImageToTexture(
-    { source: textCanvas },
-    { texture: texture },
-    [width, height],
-  );
-}
-
-const paramConfigs = [
-  { name: "ior", min: 1.0, max: 3.0, step: 0.01 },
-  { name: "blur_base", min: 0.0, max: 0.02, step: 0.0001 },
-  { name: "blur_edge", min: 0.0, max: 0.05, step: 0.0001 },
-  { name: "distortion_base", min: 0.0, max: 0.2, step: 0.001 },
-  { name: "distortion_edge", min: 0.0, max: 0.2, step: 0.001 },
-  { name: "specular_intensity", min: 0.0, max: 3.0, step: 0.01 },
-  { name: "specular_exponent", min: 1.0, max: 128.0, step: 1.0 },
-  { name: "edge_glow", min: 0.0, max: 2.0, step: 0.01 },
-  { name: "chromatic_aberration", min: 0.0, max: 0.2, step: 0.001 },
-];
-
-type ShaderParamsStore = Record<string, number>;
+import { checkWebGPUSupport, initControlsPanel } from "./ui";
+import { updateTextTexture } from "./utils/textRender";
 
 // Core WebGPU Setup
 async function init() {
-  const canvas = document.getElementById("webgpu-canvas") as HTMLCanvasElement;
-  if (!navigator.gpu) {
-    alert("WebGPU is not supported on this browser.");
-    return;
-  }
+  if (!checkWebGPUSupport()) return;
 
   const store = createStore<ShaderParamsStore>();
-
-  paramConfigs.forEach((cfg, i) => {
-    store[cfg.name] = defaultShaderParams[i];
+  paramConfigs.forEach((cfg) => {
+    store[cfg.name] = cfg.defaultValue;
   });
 
-  const controlsPanel = document.querySelector(
-    ".controls-panel",
-  ) as HTMLDivElement;
+  initControlsPanel(store, paramConfigs);
 
-  if (controlsPanel) {
-    paramConfigs.forEach((cfg) => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "control-group";
-
-      const label = document.createElement("label");
-      label.className = "control-header";
-
-      const nameSpan = document.createElement("span");
-      nameSpan.textContent = cfg.name;
-
-      const valueSpan = document.createElement("span");
-      valueSpan.textContent = store[cfg.name].toString();
-
-      label.appendChild(nameSpan);
-      label.appendChild(valueSpan);
-
-      const input = document.createElement("input");
-      input.type = "range";
-      input.min = cfg.min.toString();
-      input.max = cfg.max.toString();
-      input.step = cfg.step.toString();
-      input.value = store[cfg.name].toString();
-
-      input.addEventListener("input", (e) => {
-        store[cfg.name] = parseFloat((e.target as HTMLInputElement).value);
-      });
-
-      store.$subscribe((prop, value) => {
-        if (prop === cfg.name) {
-          valueSpan.textContent = value.toString();
-        }
-      });
-
-      wrapper.appendChild(label);
-      wrapper.appendChild(input);
-      controlsPanel.appendChild(wrapper);
-    });
-  }
-
+  const canvas = document.getElementById("webgpu-canvas") as HTMLCanvasElement;
   const adapter = await navigator.gpu.requestAdapter();
   const device = await adapter!.requestDevice();
   const context = canvas.getContext("webgpu") as GPUCanvasContext;
@@ -356,13 +256,18 @@ async function init() {
   const modelMatrix = mat4.create();
 
   function frame() {
-    angle = (angle - 0.015) % (Math.PI * 2);
+    angle = (angle - store.spin_speed) % (Math.PI * 2);
 
     mat4.identity(modelMatrix);
-    mat4.rotateX(modelMatrix, modelMatrix, Math.PI / 6);
+
+    mat4.rotateX(modelMatrix, modelMatrix, store.tilt_x);
     mat4.rotateY(modelMatrix, modelMatrix, angle);
 
-    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.75, 0.75, 0.75));
+    mat4.scale(
+      modelMatrix,
+      modelMatrix,
+      vec3.fromValues(store.size, store.size, store.size),
+    );
 
     device.queue.writeBuffer(
       pyramidUniformBuffer,
@@ -382,23 +287,22 @@ async function init() {
     device.queue.writeBuffer(
       pyramidUniformBuffer,
       144,
-      new Float32Array([canvas.width, canvas.height, 0, 0]), // Includes the vec2 padding
+      new Float32Array([canvas.width, canvas.height, 0, 0]),
     );
-
-    // Reactive parameters start at byte offset 160
+    // size, spin_speed, tilt_x handled by matrices
     const shaderParams = new Float32Array([
-      store.ior, // [0]
-      store.blur_base, // [1]
-      store.blur_edge, // [2]
-      store.distortion_base, // [3]
-      store.distortion_edge, // [4]
-      store.specular_intensity, // [5]
-      store.specular_exponent, // [6]
-      store.edge_glow, // [7]
-      store.chromatic_aberration, // [8]
-      0.0, // [9] pad1
-      0.0, // [10] pad2
-      0.0, // [11] pad3
+      store.ior,
+      store.blur_base,
+      store.blur_edge,
+      store.distortion_base,
+      store.distortion_edge,
+      store.specular_intensity,
+      store.specular_exponent,
+      store.edge_glow,
+      store.chromatic_aberration,
+      0.0, // pad1
+      0.0, // pad2
+      0.0, // pad3
     ]);
     device.queue.writeBuffer(pyramidUniformBuffer, 160, shaderParams);
 
