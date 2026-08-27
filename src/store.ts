@@ -3,7 +3,6 @@ interface ISource {
   computed: Record<string, (deps: any) => any>;
   cache: Record<string, any>;
   deps: Record<string, Set<string>>;
-  listeners: any;
 }
 
 type Store = Record<string, any>;
@@ -16,7 +15,6 @@ export const createStore = <T extends Store>() => {
     computed: {},
     cache: {},
     deps: {},
-    listeners: {},
   } satisfies ISource;
 
   const storeProxy = new Proxy(source as ISource, {
@@ -36,6 +34,11 @@ export const createStore = <T extends Store>() => {
         return target.cache[property];
       }
       if (Object.hasOwn(target.computed, property)) {
+        // TODO: change to Record<string, Ste<string>>
+        for (const dep in target.deps) {
+          target.deps[dep].delete(property);
+        }
+
         const tracker = new Set<string>();
         const depsTracker = new Proxy(receiver, {
           get(depTarget, depProp: string) {
@@ -56,7 +59,9 @@ export const createStore = <T extends Store>() => {
       }
     },
     set(target, property: string, value, receiver) {
-      const oldValue = target.static[property];
+      const oldValue = Object.hasOwn(target.static, property)
+        ? target.static[property]
+        : target.computed[property];
       if (oldValue === value && typeof value !== "function") return true;
 
       const affectedProps = new Set<string>([property]);
@@ -74,10 +79,13 @@ export const createStore = <T extends Store>() => {
       depClean(property);
 
       if (typeof value === "function") {
+        delete target.static[property];
         target.computed[property] = value;
       } else {
+        delete target.computed[property];
         target.static[property] = value;
       }
+      delete target.cache[property];
 
       affectedProps.forEach((prop) => {
         const newVal = receiver[prop];
