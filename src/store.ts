@@ -3,6 +3,7 @@ interface ISource {
   computed: Record<string, (deps: any) => any>;
   cache: Record<string, any>;
   deps: Record<string, Set<string>>;
+  rdeps: Record<string, Set<string>>;
 }
 
 type Store = Record<string, any>;
@@ -15,6 +16,7 @@ export const createStore = <T extends Store>() => {
     computed: {},
     cache: {},
     deps: {},
+    rdeps: {},
   } satisfies ISource;
 
   const storeProxy = new Proxy(source as ISource, {
@@ -34,10 +36,9 @@ export const createStore = <T extends Store>() => {
         return target.cache[property];
       }
       if (Object.hasOwn(target.computed, property)) {
-        // TODO: change to Record<string, Ste<string>>
-        for (const dep in target.deps) {
-          target.deps[dep].delete(property);
-        }
+        target.rdeps[property]?.forEach((dep) => {
+          target.deps[dep]?.delete(property);
+        });
 
         const tracker = new Set<string>();
         const depsTracker = new Proxy(receiver, {
@@ -49,6 +50,8 @@ export const createStore = <T extends Store>() => {
 
         const output = target.computed[property](depsTracker);
         target.cache[property] = output;
+
+        target.rdeps[property] = tracker;
 
         tracker.forEach((dependency) => {
           target.deps[dependency] ??= new Set();
@@ -82,6 +85,10 @@ export const createStore = <T extends Store>() => {
         delete target.static[property];
         target.computed[property] = value;
       } else {
+        target.rdeps[property]?.forEach((dep) => {
+          target.deps[dep]?.delete(property);
+        });
+        delete target.rdeps[property];
         delete target.computed[property];
         target.static[property] = value;
       }
