@@ -1,15 +1,15 @@
 interface ISource {
-  static: Record<string, any>;
-  computed: Record<string, (deps: any) => any>;
-  cache: Record<string, any>;
-  deps: Record<string, Set<string>>;
-  rdeps: Record<string, Set<string>>;
+  static: Record<string, any>
+  computed: Record<string, (deps: any) => any>
+  cache: Record<string, any>
+  deps: Record<string, Set<string>>
+  rdeps: Record<string, Set<string>>
 }
 
-type Store = Record<string, any>;
+type Store = Record<string, any>
 
 export const createStore = <T extends Store>() => {
-  const listeners = new Set<(property: string, value: any) => void>();
+  const listeners = new Set<(property: string, value: any) => void>()
 
   const source = {
     static: {},
@@ -17,95 +17,95 @@ export const createStore = <T extends Store>() => {
     cache: {},
     deps: {},
     rdeps: {},
-  } satisfies ISource;
+  } satisfies ISource
 
   const storeProxy = new Proxy(source as ISource, {
     get(target, property: string, receiver) {
       // Expose the subscription mechanism on a special key
-      if (property === "$subscribe") {
+      if (property === '$subscribe') {
         return (listener: (prop: string, val: any) => void) => {
-          listeners.add(listener);
-          return () => listeners.delete(listener); // Unsubscribe function
-        };
+          listeners.add(listener)
+          return () => listeners.delete(listener) // Unsubscribe function
+        }
       }
 
       if (Object.hasOwn(target.static, property)) {
-        return target.static[property];
+        return target.static[property]
       }
       if (Object.hasOwn(target.cache, property)) {
-        return target.cache[property];
+        return target.cache[property]
       }
       if (Object.hasOwn(target.computed, property)) {
         target.rdeps[property]?.forEach((dep) => {
-          target.deps[dep]?.delete(property);
-        });
+          target.deps[dep]?.delete(property)
+        })
 
-        const tracker = new Set<string>();
+        const tracker = new Set<string>()
         const depsTracker = new Proxy(receiver, {
           get(depTarget, depProp: string) {
-            tracker.add(depProp);
-            return depTarget[depProp];
+            tracker.add(depProp)
+            return depTarget[depProp]
           },
-        });
+        })
 
-        const output = target.computed[property](depsTracker);
-        target.cache[property] = output;
+        const output = target.computed[property](depsTracker)
+        target.cache[property] = output
 
-        target.rdeps[property] = tracker;
+        target.rdeps[property] = tracker
 
         tracker.forEach((dependency) => {
-          target.deps[dependency] ??= new Set();
-          target.deps[dependency].add(property);
-        });
+          target.deps[dependency] ??= new Set()
+          target.deps[dependency].add(property)
+        })
 
-        return output;
+        return output
       }
     },
     set(target, property: string, value, receiver) {
       const oldValue = Object.hasOwn(target.static, property)
         ? target.static[property]
-        : target.computed[property];
-      if (oldValue === value && typeof value !== "function") return true;
+        : target.computed[property]
+      if (oldValue === value && typeof value !== 'function') return true
 
-      const affectedProps = new Set<string>([property]);
+      const affectedProps = new Set<string>([property])
 
       const depClean = (prop: string) => {
         target.deps[prop]?.forEach((dep: string) => {
           if (!affectedProps.has(dep)) {
-            delete target.cache[dep];
-            affectedProps.add(dep);
-            depClean(dep);
+            delete target.cache[dep]
+            affectedProps.add(dep)
+            depClean(dep)
           }
-        });
-      };
+        })
+      }
 
-      depClean(property);
+      depClean(property)
 
-      if (typeof value === "function") {
-        delete target.static[property];
-        target.computed[property] = value;
+      if (typeof value === 'function') {
+        delete target.static[property]
+        target.computed[property] = value
       } else {
         target.rdeps[property]?.forEach((dep) => {
-          target.deps[dep]?.delete(property);
-        });
-        delete target.rdeps[property];
-        delete target.computed[property];
-        target.static[property] = value;
+          target.deps[dep]?.delete(property)
+        })
+        delete target.rdeps[property]
+        delete target.computed[property]
+        target.static[property] = value
       }
-      delete target.cache[property];
+      delete target.cache[property]
 
       affectedProps.forEach((prop) => {
-        const newVal = receiver[prop];
-        listeners.forEach((listener) => listener(prop, newVal));
-      });
+        const newVal = receiver[prop]
+        listeners.forEach((listener) => listener(prop, newVal))
+      })
 
-      return true;
+      return true
     },
-  });
+  })
 
   return storeProxy as unknown as T & {
     $subscribe: (
       listener: (property: keyof T, value: any) => void,
-    ) => () => void;
-  };
-};
+    ) => () => void
+  }
+}

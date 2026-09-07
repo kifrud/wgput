@@ -43,7 +43,6 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-// HELPER: Safely handle Total Internal Reflection (TIR)
 fn safe_refract(i: vec3<f32>, n: vec3<f32>, eta: f32) -> vec3<f32> {
     let r = refract(i, n, eta);
     if dot(r, r) < 0.01 {
@@ -62,7 +61,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let r0 = pow((1.0 - uniforms.ior) / (1.0 + uniforms.ior), 2.0);
     let reflectance = r0 + (1.0 - r0) * pow(1.0 - cos_theta, 5.0);
 
-    // CHROMATIC ABERRATION (Now using your reactive variable)
+    // CHROMATIC ABERRATION
     let ior_r = uniforms.ior - uniforms.chromatic_aberration;
     let ior_g = uniforms.ior;
     let ior_b = uniforms.ior + uniforms.chromatic_aberration;
@@ -109,8 +108,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let specular = pow(spec_angle, uniforms.specular_exponent) * uniforms.specular_intensity;
 
-    // WIDER, MORE VISIBLE RIM LIGHTING
-    // Lowered the exponent from 3.0 to 1.5 so the light wraps around the edge more
     let rim_width = pow(1.0 - cos_theta, 1.5);
     let edge_glow_color = vec3<f32>(1.0) * rim_width * uniforms.edge_glow;
 
