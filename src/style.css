@@ -70,6 +70,7 @@ canvas {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   pointer-events: auto;
+  max-height: 85dvh;
 }
 
 .control-group {

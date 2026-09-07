@@ -54,7 +54,7 @@ async function init() {
     alphaMode: 'premultiplied',
   })
 
-  const getDevicePixelRatio = () => Math.min(window.devicePixelRatio || 1, 2)
+  const getDevicePixelRatio = () => Math.min(window.devicePixelRatio ?? 1)
 
   let depthTexture = device.createTexture({
     size: [1, 1],

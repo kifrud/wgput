@@ -17,20 +17,23 @@ export function initControlsPanel(
   const controlsToggle = document.getElementById('controls-toggle')
   const controlsContent = document.getElementById('controls-content')
   const controlsChevron = document.getElementById('controls-chevron')
+
+  if (controlsContent && controlsChevron && window.innerWidth < 768) {
+    controlsContent.classList.add('max-h-0', 'opacity-0', 'mt-0')
+    controlsContent.classList.remove('opacity-100', 'mt-4')
+    controlsChevron.classList.add('rotate-180')
+  }
+
   if (controlsToggle && controlsContent && controlsChevron) {
     controlsToggle.addEventListener('click', () => {
       const isCollapsed = controlsContent.classList.contains('max-h-0')
       if (isCollapsed) {
         controlsContent.classList.remove('max-h-0', 'opacity-0', 'mt-0')
-        controlsContent.classList.add('max-h-[1000px]', 'opacity-100', 'mt-4')
+        controlsContent.classList.add('opacity-100', 'mt-4')
         controlsChevron.classList.remove('rotate-180')
       } else {
         controlsContent.classList.add('max-h-0', 'opacity-0', 'mt-0')
-        controlsContent.classList.remove(
-          'max-h-[1000px]',
-          'opacity-100',
-          'mt-4',
-        )
+        controlsContent.classList.remove('opacity-100', 'mt-4')
         controlsChevron.classList.add('rotate-180')
       }
     })

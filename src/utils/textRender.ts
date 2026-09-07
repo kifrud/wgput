@@ -19,7 +19,7 @@ export function updateTextTexture(
 
   // Text
   textCtx.fillStyle = '#ffffff'
-  textCtx.font = '16px "Anonymous Pro", monospace'
+  textCtx.font = `1rem "Anonymous Pro", monospace`
   textCtx.textAlign = 'center'
   textCtx.textBaseline = 'middle'
   textCtx.fillText(TEXT, width / 2, height / 2)
@@ -27,6 +27,7 @@ export function updateTextTexture(
   if (hovered) {
     const metrics = textCtx.measureText(TEXT)
     const textWidth = metrics.width
+
     textCtx.fillRect((width - textWidth) / 2, height / 2 + 8, textWidth, 1)
   }
 
