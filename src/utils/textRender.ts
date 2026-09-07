@@ -17,9 +17,16 @@ export function updateTextTexture(
   textCtx.fillStyle = '#000000'
   textCtx.fillRect(0, 0, width, height)
 
+  const dpr = window.devicePixelRatio || 1
+  const rootFontSize = parseFloat(
+    getComputedStyle(document.documentElement).fontSize,
+  )
+
+  const fontSize = rootFontSize * dpr
+
   // Text
   textCtx.fillStyle = '#ffffff'
-  textCtx.font = `1rem "Anonymous Pro", monospace`
+  textCtx.font = `${fontSize}px "Anonymous Pro", monospace`
   textCtx.textAlign = 'center'
   textCtx.textBaseline = 'middle'
   textCtx.fillText(TEXT, width / 2, height / 2)
