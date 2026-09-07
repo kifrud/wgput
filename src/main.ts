@@ -7,7 +7,7 @@ import { paramConfigs, type ShaderParamsStore } from './config'
 import { createStore } from './store'
 import { checkWebGPUSupport, initControlsPanel } from './ui'
 import { updateTextTexture } from './utils/textRender'
-import { UNIFORM_BUFFER_SIZE, UNIFORM_OFFSETS } from './utils/uniformLayour'
+import { UNIFORM_BUFFER_SIZE, UNIFORM_OFFSETS } from './utils/uniformLayout'
 
 function showUnsupportedOverlay() {
   const fallbackOverlay = document.getElementById('no-webgpu-overlay')
