@@ -1,0 +1,9 @@
+export const UNIFORM_OFFSETS = {
+  MODEL: 0,
+  VIEW_PROJ: 64,
+  CAMERA_POS: 128,
+  RESOLUTION: 144,
+  SHADER_PARAMS: 160,
+} as const
+
+export const UNIFORM_BUFFER_SIZE = 208

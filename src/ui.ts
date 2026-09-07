@@ -1,4 +1,5 @@
 import type { ParamConfig, ShaderParamsStore } from './config'
+import type { ReactiveStore } from './store'
 
 export function checkWebGPUSupport(): boolean {
   if (!navigator.gpu) {
@@ -9,11 +10,13 @@ export function checkWebGPUSupport(): boolean {
   return true
 }
 
-export function initControlsPanel(store: any, paramConfigs: ParamConfig[]) {
+export function initControlsPanel(
+  store: ReactiveStore<ShaderParamsStore>,
+  paramConfigs: ParamConfig[],
+) {
   const controlsToggle = document.getElementById('controls-toggle')
   const controlsContent = document.getElementById('controls-content')
   const controlsChevron = document.getElementById('controls-chevron')
-
   if (controlsToggle && controlsContent && controlsChevron) {
     controlsToggle.addEventListener('click', () => {
       const isCollapsed = controlsContent.classList.contains('max-h-0')
@@ -32,49 +35,39 @@ export function initControlsPanel(store: any, paramConfigs: ParamConfig[]) {
       }
     })
   }
-
   if (controlsContent) {
     paramConfigs.forEach((cfg) => {
       const wrapper = document.createElement('div')
       wrapper.className = 'control-group'
-
       const label = document.createElement('label')
       label.className = 'control-header select-none cursor-pointer'
-
       const nameSpan = document.createElement('span')
       nameSpan.textContent = cfg.name
-
       const valueSpan = document.createElement('span')
       valueSpan.textContent = store[cfg.name].toString()
-
       label.appendChild(nameSpan)
       label.appendChild(valueSpan)
-
       const input = document.createElement('input')
       input.type = 'range'
       input.min = cfg.min.toString()
       input.max = cfg.max.toString()
       input.step = cfg.step.toString()
       input.value = store[cfg.name].toString()
-
+      input.setAttribute('aria-label', `${cfg.name} (${cfg.min} to ${cfg.max})`)
       input.addEventListener('input', (e: Event) => {
         store[cfg.name] = parseFloat((e.target as HTMLInputElement).value)
       })
-
       const resetToDefault = () => {
         store[cfg.name] = cfg.defaultValue
         input.value = cfg.defaultValue.toString()
       }
-
       input.addEventListener('dblclick', resetToDefault)
       label.addEventListener('dblclick', resetToDefault)
-
-      store.$subscribe((prop: keyof ShaderParamsStore, value: any) => {
+      store.$subscribe((prop, value: any) => {
         if (prop === cfg.name) {
           valueSpan.textContent = value.toString()
         }
       })
-
       wrapper.appendChild(label)
       wrapper.appendChild(input)
       controlsContent.appendChild(wrapper)

@@ -1,4 +1,5 @@
 import { mat4, vec3 } from 'gl-matrix'
+import './style.css'
 import pyramidShader from './shaders/pyramid.wgsl?raw'
 import fullscreenBgShader from './shaders/bg.wgsl?raw'
 import { generatePyramidData } from './utils/genPyramidData'
@@ -6,7 +7,12 @@ import { paramConfigs, type ShaderParamsStore } from './config'
 import { createStore } from './store'
 import { checkWebGPUSupport, initControlsPanel } from './ui'
 import { updateTextTexture } from './utils/textRender'
-import './style.css'
+import { UNIFORM_BUFFER_SIZE, UNIFORM_OFFSETS } from './utils/uniformLayour'
+
+function showUnsupportedOverlay() {
+  const fallbackOverlay = document.getElementById('no-webgpu-overlay')
+  if (fallbackOverlay) fallbackOverlay.classList.remove('hidden')
+}
 
 // Core WebGPU Setup
 async function init() {
@@ -20,13 +26,27 @@ async function init() {
   initControlsPanel(store, paramConfigs)
 
   const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
+
   const adapter = await navigator.gpu.requestAdapter()
-  const device = await adapter!.requestDevice()
+  if (!adapter) {
+    showUnsupportedOverlay()
+    return
+  }
+
+  const device = await adapter.requestDevice()
+
+  device.lost.then((info) => {
+    console.error(
+      `WebGPU device lost (${info.reason ?? 'unknown'}): ${info.message}`,
+    )
+    stopLoop()
+    if (info.reason !== 'destroyed') {
+      showUnsupportedOverlay()
+    }
+  })
+
   const context = canvas.getContext('webgpu') as GPUCanvasContext
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat()
-
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
 
   context.configure({
     device,
@@ -34,14 +54,16 @@ async function init() {
     alphaMode: 'premultiplied',
   })
 
+  const getDevicePixelRatio = () => Math.min(window.devicePixelRatio || 1, 2)
+
   let depthTexture = device.createTexture({
-    size: [canvas.width, canvas.height],
+    size: [1, 1],
     format: 'depth24plus',
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
   })
 
   let bgTexture = device.createTexture({
-    size: [canvas.width, canvas.height, 1],
+    size: [1, 1, 1],
     format: 'rgba8unorm',
     usage:
       GPUTextureUsage.TEXTURE_BINDING |
@@ -49,9 +71,7 @@ async function init() {
       GPUTextureUsage.RENDER_ATTACHMENT,
   })
 
-  // Initial draw (No hover)
   let isHovered = false
-  updateTextTexture(device, bgTexture, canvas.width, canvas.height, isHovered)
 
   const bgSampler = device.createSampler({
     magFilter: 'linear',
@@ -79,7 +99,7 @@ async function init() {
   normalBuffer.unmap()
 
   const pyramidUniformBuffer = device.createBuffer({
-    size: 208,
+    size: UNIFORM_BUFFER_SIZE,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   })
 
@@ -152,7 +172,6 @@ async function init() {
       ],
     })
   }
-  updateBindGroups()
 
   // Interaction Events
   const hoverLink = document.getElementById('hover-link') as HTMLAnchorElement
@@ -198,8 +217,11 @@ async function init() {
   const viewProjMatrix = mat4.create()
 
   function handleResize() {
-    canvas.width = Math.max(1, window.innerWidth)
-    canvas.height = Math.max(1, window.innerHeight)
+    const dpr = getDevicePixelRatio()
+    canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr))
+    canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr))
+    canvas.style.width = `${window.innerWidth}px`
+    canvas.style.height = `${window.innerHeight}px`
 
     bgTexture.destroy()
     bgTexture = device.createTexture({
@@ -231,20 +253,26 @@ async function init() {
     mat4.multiply(projectionMatrix, depthZO, projectionMatrix)
     mat4.multiply(viewProjMatrix, projectionMatrix, viewMatrix)
   }
-  window.addEventListener('resize', handleResize)
+
+  let resizeTimeout: ReturnType<typeof setTimeout> | undefined
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout)
+    resizeTimeout = setTimeout(handleResize, 100)
+  })
   handleResize()
 
   let angle = 0
   const modelMatrix = mat4.create()
+  let animationFrameId: number | null = null
 
   function frame() {
+    animationFrameId = requestAnimationFrame(frame)
+
     angle = (angle - store.spin_speed) % (Math.PI * 2)
 
     mat4.identity(modelMatrix)
-
     mat4.rotateX(modelMatrix, modelMatrix, store.tilt_x)
     mat4.rotateY(modelMatrix, modelMatrix, angle)
-
     mat4.scale(
       modelMatrix,
       modelMatrix,
@@ -253,22 +281,22 @@ async function init() {
 
     device.queue.writeBuffer(
       pyramidUniformBuffer,
-      0,
+      UNIFORM_OFFSETS.MODEL,
       new Float32Array(modelMatrix as Float32Array),
     )
     device.queue.writeBuffer(
       pyramidUniformBuffer,
-      64,
+      UNIFORM_OFFSETS.VIEW_PROJ,
       new Float32Array(viewProjMatrix as Float32Array),
     )
     device.queue.writeBuffer(
       pyramidUniformBuffer,
-      128,
+      UNIFORM_OFFSETS.CAMERA_POS,
       new Float32Array([...cameraPos, 1.0]),
     )
     device.queue.writeBuffer(
       pyramidUniformBuffer,
-      144,
+      UNIFORM_OFFSETS.RESOLUTION,
       new Float32Array([canvas.width, canvas.height, 0, 0]),
     )
     // size, spin_speed, tilt_x handled by matrices
@@ -286,7 +314,11 @@ async function init() {
       0.0, // pad2
       0.0, // pad3
     ])
-    device.queue.writeBuffer(pyramidUniformBuffer, 160, shaderParams)
+    device.queue.writeBuffer(
+      pyramidUniformBuffer,
+      UNIFORM_OFFSETS.SHADER_PARAMS,
+      shaderParams,
+    )
 
     const commandEncoder = device.createCommandEncoder()
     const passEncoder = commandEncoder.beginRenderPass({
@@ -318,11 +350,28 @@ async function init() {
 
     passEncoder.end()
     device.queue.submit([commandEncoder.finish()])
-
-    requestAnimationFrame(frame)
   }
 
-  requestAnimationFrame(frame)
+  function startLoop() {
+    if (animationFrameId === null) frame()
+  }
+
+  function stopLoop() {
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = null
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopLoop()
+    } else {
+      startLoop()
+    }
+  })
+
+  startLoop()
 }
 
 init()
